@@ -1,34 +1,42 @@
-# WildQuest
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-WildQuest is a gamified wildlife identification application focused
-on common species found in Washington, D.C., Maryland, and Northern Virginia.
+# Virtual environments
+.venv/
+venv/
+env/
 
-## Project Overview
+# Secrets
+.env
+.env.*
+!.env.example
 
-WildQuest uses computer vision and deep learning to:
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
 
-1. Detect wildlife in submitted photographs.
-2. Crop the detected animal.
-3. Classify its species using a fine-tuned EfficientNet model.
-4. Record observations and prediction confidence.
-5. Reward valid wildlife discoveries with XP.
+# Jupyter
+.ipynb_checkpoints/
 
-## Technology
+# Datasets
+data/raw/
+data/interim/
+data/processed/
 
-- Python
-- PyTorch
-- EfficientNet
-- MegaDetector
-- iNaturalist Open Data
+# Training artifacts
+outputs/
+runs/
+wandb/
+checkpoints/
 
-## Development Status
-
-Initial project setup.
-
-## Team Workflow
-
-All development follows:
-
-GitHub Issue → Feature Branch → Pull Request → Review → Merge
-
-Direct pushes to `main` are not permitted after repository setup.
+# Model weights
+*.pt
+*.pth
+*.ckpt
+*.onnx

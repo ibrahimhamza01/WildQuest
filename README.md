@@ -1,34 +1,17 @@
 # WildQuest
 
-WildQuest is a gamified wildlife identification application focused
-on common species found in Washington, D.C., Maryland, and Northern Virginia.
+WildQuest identifies common wildlife photographed in Washington, D.C., Maryland and Northern Virginia. It will use a pretrained animal detector, an EfficientNet species classifier, and an observation/XP system.
 
-## Project Overview
+## Dataset
 
-WildQuest uses computer vision and deep learning to:
+25 classes; 25,000 validated, licensed iNaturalist photographs. See [dataset setup](Code/README.md).
 
-1. Detect wildlife in submitted photographs.
-2. Crop the detected animal.
-3. Classify its species using a fine-tuned EfficientNet model.
-4. Record observations and prediction confidence.
-5. Reward valid wildlife discoveries with XP.
+```bash
+python Code/scripts/get_dataset.py
+```
 
-## Technology
+Requires Python 3.9+, AWS CLI v2 and read access to the team dataset S3 bucket.
 
-- Python
-- PyTorch
-- EfficientNet
-- MegaDetector
-- iNaturalist Open Data
+## Development
 
-## Development Status
-
-Initial project setup.
-
-## Team Workflow
-
-All development follows:
-
-GitHub Issue → Feature Branch → Pull Request → Review → Merge
-
-Direct pushes to `main` are not permitted after repository setup.
+Issue → branch → PR → review → merge. Do not commit raw images, model weights, or credentials.

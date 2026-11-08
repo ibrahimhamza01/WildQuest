@@ -4,8 +4,6 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-
-# Virtual environments
 .venv/
 venv/
 env/
@@ -15,27 +13,24 @@ env/
 .env.*
 !.env.example
 
-# IDE and OS
+# Editor / OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-
-# Jupyter
 .ipynb_checkpoints/
 
-# Datasets
-data/raw/
-data/interim/
-data/processed/
+# Local datasets, archives, and one-time setup files
+data/
+_setup_once/
+*.zip
+Code/reports/
 
-# Training artifacts
+# Model artifacts
 outputs/
 runs/
 wandb/
 checkpoints/
-
-# Model weights
 *.pt
 *.pth
 *.ckpt

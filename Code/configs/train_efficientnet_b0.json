@@ -2,6 +2,7 @@
   "seed": 42,
   "batch_size": 32,
   "num_workers": 4,
+  "persistent_workers": false,
   "head_epochs": 3,
   "finetune_epochs": 12,
   "unfreeze_last_n": 2,

@@ -7,12 +7,15 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import torch
 from PIL import Image
+from torchvision import transforms
+from torchvision.transforms import InterpolationMode
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from wildquest.classifier.dataset import WildlifeDataset
+from wildquest.classifier.dataset import IMAGENET_MEAN, IMAGENET_STD, WildlifeDataset, make_dataloaders
 from wildquest.classifier.model import build_model, set_trainable_feature_blocks, make_optimizer
 
 
@@ -32,20 +35,45 @@ class ClassifierTests(unittest.TestCase):
                     relative = f"data/raw/images/{split}/03/example.jpg"
                     path = root / relative
                     path.parent.mkdir(parents=True)
-                    Image.new("RGB", (300, 250), color="orange").save(path)
+                    Image.linear_gradient("L").convert("RGB" if split == "train" else "L").save(path)
                     writer.writerow(dict(class_id="3", split=split, local_path=relative,
                                          scientific_name="species_3"))
             train = WildlifeDataset(root, "train")
             val = WildlifeDataset(root, "val")
             self.assertEqual(len(train), 1)
             self.assertEqual(len(val), 1)
+            # Compare the fast RGB path and in-place normalization to the original pipeline.
+            original = transforms.Compose([
+                transforms.RandomResizedCrop(224, scale=(0.75, 1.0), interpolation=InterpolationMode.BICUBIC),
+                transforms.RandomHorizontalFlip(), transforms.ToTensor(),
+                transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+            ])
+            with Image.open(train.samples[0][0]) as source:
+                torch.manual_seed(42)
+                expected = original(source.convert("RGB"))
+            torch.manual_seed(42)
             image, label = train[0]
+            self.assertTrue(torch.equal(image, expected))
+            with Image.open(val.samples[0][0]) as source:
+                self.assertTrue(torch.equal(val[0][0], val.transform(source.convert("RGB"))))
             self.assertEqual(tuple(image.shape), (3, 224, 224))
             self.assertEqual(label, 3)
             with self.assertRaises(ValueError):
                 WildlifeDataset(root, "test")
             with self.assertRaises(ValueError):
                 WildlifeDataset(root, "dmv_test")
+
+    def test_loader_worker_and_pinning_options(self):
+        with patch("wildquest.classifier.dataset.WildlifeDataset", return_value=list(range(4))):
+            for workers in (0, 2):
+                loaders = make_dataloaders(".", num_workers=workers, persistent_workers=True,
+                                           pin_memory=False)
+                for loader in loaders:
+                    self.assertEqual(loader.persistent_workers, workers > 0)
+                    self.assertFalse(loader.pin_memory)
+            for loader in make_dataloaders(".", pin_memory=True):
+                self.assertFalse(loader.persistent_workers)
+                self.assertTrue(loader.pin_memory)
 
     def test_model_output_and_freezing(self):
         model = build_model(pretrained=False)
@@ -73,7 +101,7 @@ class ClassifierTests(unittest.TestCase):
         spec.loader.exec_module(module)
         x = torch.randn(4, 3, 8, 8)
         y = torch.tensor([0, 1, 2, 3])
-        loader = DataLoader(TensorDataset(x, y), batch_size=2)
+        loader = DataLoader(TensorDataset(x, y), batch_size=3)
         class TinyModel(nn.Module):
             def __init__(self):
                 super().__init__()
@@ -94,8 +122,15 @@ class ClassifierTests(unittest.TestCase):
         self.assertFalse(torch.equal(before, model.classifier[0].weight))
         val_loss, val_acc = module.run_epoch(model, loader, torch.device("cpu"),
                                              nn.CrossEntropyLoss())
-        self.assertGreater(val_loss, 0)
-        self.assertTrue(0 <= val_acc <= 1)
+        expected_loss = 0.0
+        correct = 0
+        with torch.no_grad():
+            for images, labels in loader:
+                logits = model(images)
+                expected_loss += nn.CrossEntropyLoss()(logits, labels).item() * len(labels)
+                correct += logits.argmax(1).eq(labels).sum().item()
+        self.assertEqual(val_loss, expected_loss / len(y))
+        self.assertEqual(val_acc, correct / len(y))
 
     def test_checkpoint_reloads(self):
         with tempfile.TemporaryDirectory() as temp:

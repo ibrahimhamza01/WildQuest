@@ -22,7 +22,7 @@ def image_transforms(split):
             transforms.RandomResizedCrop(224, scale=(0.75, 1.0), interpolation=InterpolationMode.BICUBIC),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+            transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD, inplace=True),
         ])
     if split == "val":
         return EfficientNet_B0_Weights.IMAGENET1K_V1.transforms()
@@ -40,6 +40,7 @@ class WildlifeDataset(Dataset):
         mapping = Path(mapping_path) if mapping_path else root / "Code/configs/class_mapping.json"
         self.repo_root = root
         self.split = split
+        self._uses_default_transform = transform is None
         self.transform = transform if transform is not None else image_transforms(split)
 
         labels = json.loads(mapping.read_text(encoding="utf-8"))["id_to_label"]
@@ -72,24 +73,29 @@ class WildlifeDataset(Dataset):
     def __getitem__(self, index):
         image_path, label = self.samples[index]
         with Image.open(image_path) as image:
-            image = image.convert("RGB")
+            # PIL copies an already-RGB frame on convert. The built-in transforms
+            # consume it while the file is open. Keep custom transforms' owned copy.
+            if image.mode != "RGB" or not self._uses_default_transform:
+                image = image.convert("RGB")
             tensor = self.transform(image)
         return tensor, label
 
 
-def make_dataloaders(repo_root, batch_size=32, num_workers=4, seed=42):
+def make_dataloaders(repo_root, batch_size=32, num_workers=4, seed=42, *,
+                     pin_memory=None, persistent_workers=False):
     """Construct *only* training and validation loaders (never held-out tests)."""
     import torch
     train = WildlifeDataset(repo_root, "train")
     val = WildlifeDataset(repo_root, "val")
-    use_cuda = torch.cuda.is_available()
     generator = torch.Generator().manual_seed(seed)
-    train_loader = DataLoader(
-        train, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-        pin_memory=use_cuda, generator=generator,
+    # Persistence is opt-in: surviving workers carry their augmentation RNG into the next epoch.
+    options = dict(
+        batch_size=batch_size,
+        num_workers=num_workers,
+        generator=generator,
+        pin_memory=torch.cuda.is_available() if pin_memory is None else pin_memory,
+        persistent_workers=persistent_workers and num_workers > 0,
     )
-    val_loader = DataLoader(
-        val, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-        pin_memory=use_cuda, generator=generator,
-    )
+    train_loader = DataLoader(train, shuffle=True, **options)
+    val_loader = DataLoader(val, shuffle=False, **options)
     return train_loader, val_loader

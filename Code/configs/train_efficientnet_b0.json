@@ -1,0 +1,13 @@
+{
+  "seed": 42,
+  "batch_size": 32,
+  "num_workers": 4,
+  "head_epochs": 3,
+  "finetune_epochs": 12,
+  "unfreeze_last_n": 2,
+  "head_lr": 0.001,
+  "backbone_lr": 0.0001,
+  "weight_decay": 0.0001,
+  "early_stopping_patience": 4,
+  "output_dir": "outputs/efficientnet_b0"
+}

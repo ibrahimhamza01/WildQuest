@@ -1,25 +1,64 @@
-# Dataset
+# WildQuest — Code
 
-25 wildlife species; 25,000 licensed iNaturalist photographs. Fixed selection from the 2026-10-27 Open Dataset snapshot. The manifest includes class labels, observation IDs, licenses, original photo URLs, splits and SHA-256 hashes.
+This directory contains WildQuest's implementation, configurations, and tests.
 
-## Download
+Run all commands from the **repository root**.
 
-Install Python 3.9+ and AWS CLI v2. You need read access to the team S3 bucket.
+## Environment
+
+Development and GPU training use the course-provided `dl-venv` on AWS EC2.
+
+Python dependencies are listed in `Code/requirements.txt`. On a fresh environment, install the appropriate CUDA-compatible PyTorch build and the listed dependencies.
+
+The dataset downloader requires AWS CLI v2 and read access to the team's S3 bucket.
+
+## Execution Order
+
+**1. Download the dataset**
 
 ```bash
 python Code/scripts/get_dataset.py
 ```
 
-The script downloads into `data/raw/images/`, verifies all 25,000 hashes, and can repair missing files. To check an existing local dataset without S3 access:
+Downloads the frozen 25,000-image dataset into `data/raw/images/`.
+
+**2. Verify dataset integrity**
 
 ```bash
 python Code/scripts/get_dataset.py --verify-only
 ```
 
-Source priority: `--source`, `WILDQUEST_DATASET_URI`, then `DEFAULT_DATASET_URI` in `Code/scripts/get_dataset.py`. The maintainer sets the default once before merging.
+**3. Run tests**
 
-## Integrity
+```bash
+python -m unittest discover -s Code/tests -v
+```
 
-The committed `Code/configs/dataset_manifest.csv` is frozen. Don't modify the class map or test splits. Check integrity with `python -m unittest discover -s Code/tests -v`.
+**4. Smoke-test the classifier**
 
-CC-BY images require attribution. Before redistributing images or using them publicly, verify the photographer/creator credits; observation author IDs alone may not be sufficient. DMV coverage is an approximate geographic bounding box.
+```bash
+python Code/scripts/train_classifier.py --smoke-test
+```
+
+**5. Train EfficientNet-B0**
+
+```bash
+python Code/scripts/train_classifier.py
+```
+
+Training settings are defined in `Code/configs/train_efficientnet_b0.json`.
+
+## Components
+
+- [EfficientNet classifier](src/wildquest/classifier/README.md) — Architecture, transfer learning, training configuration, and results.
+- `scripts/get_dataset.py` — Dataset downloading, integrity verification, and repair.
+
+## Dataset and Reproducibility
+
+The dataset is frozen using `Code/configs/dataset_manifest.csv` and `class_mapping.json`. Do not change the existing split assignments or class IDs.
+
+Training uses only the `train` and `val` splits. The general and DMV test splits are reserved for final evaluation.
+
+The dataset contains licensed iNaturalist photos from the October 27, 2026 Open Dataset snapshot. Preserve source and license metadata; CC-BY redistribution requires appropriate attribution. DMV coverage uses an approximate geographic bounding box.
+
+Local datasets and model outputs are excluded from Git. Do not commit raw images, checkpoints, or credentials.

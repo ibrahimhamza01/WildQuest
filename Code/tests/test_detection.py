@@ -1,16 +1,26 @@
 """CPU-only tests of animal detection and cropping with a mocked engine."""
 
+import csv
+import importlib.util
+import io
+import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from PIL import Image
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+CODE = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(CODE / "src"))
 from wildquest.detection import Detection, MegaDetector, crop_animal
+
+spec = importlib.util.spec_from_file_location("detector_cli", CODE / "scripts/test_detector.py")
+detector_cli = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(detector_cli)
 
 
 def prediction(box, confidence=0.9, label="animal"):
@@ -188,6 +198,139 @@ class DetectionTests(unittest.TestCase):
             with self.subTest(threshold=threshold):
                 with self.assertRaises(ValueError):
                     MegaDetector(confidence_threshold=threshold)
+
+
+class DetectorCliTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.output = self.root / "outputs/detection/run"
+        self.bundle = self.root / "models/MDV6-yolov10-e"
+        self.bundle.mkdir(parents=True)
+        (self.bundle / "model.onnx").write_bytes(b"mock weights")
+        (self.bundle / "manifest.toml").write_text(
+            '[model]\nid = "MDV6-yolov10-e"\nformat = "onnx"\nfile = "model.onnx"\n'
+        )
+        patcher = patch.object(detector_cli, "ROOT", self.root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def args(self, *inputs):
+        return ["--output-dir", str(self.output), "--model-bundle", str(self.bundle), *inputs]
+
+    def write_manifest(self, rows):
+        configs = self.root / "Code/configs"
+        configs.mkdir(parents=True, exist_ok=True)
+        manifest = configs / "dataset_manifest.csv"
+        with manifest.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+            writer.writeheader()
+            writer.writerows(rows)
+        (configs / "dataset_manifest.sha256").write_text(detector_cli.sha256(manifest))
+
+    def test_invalid_arguments_are_rejected(self):
+        for inputs in (
+            ("--split", "test"),
+            ("--split", "dmv_test"),
+            ("--split", "val", "--image", "photo.jpg"),
+            ("--split", "val", "--threshold", "nan"),
+            ("--split", "val", "--sample-per-class", "0"),
+        ):
+            with self.subTest(inputs=inputs), redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as failure:
+                    detector_cli.main(self.args(*inputs))
+                self.assertEqual(failure.exception.code, 2)
+        self.assertFalse(self.output.exists())
+
+    def test_output_path_refuses_overwrites_and_escapes(self):
+        self.output.mkdir(parents=True)
+        marker = self.output / "existing.json"
+        marker.write_text("keep me")
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            detector_cli.main(self.args("--split", "val"))
+        self.assertEqual(marker.read_text(), "keep me")
+        with self.assertRaisesRegex(ValueError, "under outputs/detection"):
+            detector_cli.output_directory(self.root / "elsewhere")
+        escape = self.output.parent / "escape"
+        escape.symlink_to(self.root, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "under outputs/detection"):
+            detector_cli.output_directory(escape / "other")
+
+    def test_held_out_paths_and_symlink_aliases_are_rejected(self):
+        for split in ("test", "dmv_test"):
+            held_out = self.root / "data/raw/images" / split / "00/photo.jpg"
+            alias = self.root / f"{split}-alias.jpg"
+            alias.symlink_to(held_out)
+            for path in (held_out, alias):
+                with self.subTest(path=path):
+                    with self.assertRaisesRegex(ValueError, "train/val manifest"):
+                        detector_cli.resolve_image(path, {})
+
+    def test_sampling_is_reproducible_balanced_and_prefers_distinct_observations(self):
+        rows = [
+            {"split": split, "class_id": str(class_id), "photo_id": str(index),
+             "observation_uuid": f"{class_id}-{observation}"}
+            for split in ("train", "val", "test", "dmv_test")
+            for class_id in (0, 1)
+            for index, observation in enumerate(("one", "one", "two"))
+        ]
+        sample = detector_cli.sample_rows(rows, "val", 2, 42)
+        self.assertEqual(sample, detector_cli.sample_rows(list(reversed(rows)), "val", 2, 42))
+        self.assertEqual([row["class_id"] for row in sample], ["0", "0", "1", "1"])
+        self.assertTrue(all(row["split"] == "val" for row in sample))
+        self.assertEqual(len({row["observation_uuid"] for row in sample}), 4)
+
+    def test_cli_records_outputs_empty_results_and_failures(self):
+        row = {
+            "local_path": "data/raw/images/val/00/first.png", "split": "val", "class_id": "0",
+            "scientific_name": "Anas platyrhynchos", "group": "Bird", "photo_id": "1",
+            "observation_uuid": "first-observation", "license": "CC0",
+        }
+        first = self.root / row["local_path"]
+        first.parent.mkdir(parents=True)
+        Image.new("RGB", (8, 6), "blue").save(first)
+        self.write_manifest([{**row, "file_sha256": detector_cli.sha256(first)}])
+        second = self.root / "blank.png"
+        Image.new("RGB", (7, 5)).save(second)
+        missing = self.root / "missing.png"
+        engine = SimpleNamespace(init=Mock(), active_device=lambda: "cpu", __version__="test")
+        detector = Mock()
+        detector.return_value.detect.side_effect = [
+            [Detection("animal", 0.8, (1, 2, 5, 6)), Detection("animal", 0.7, (2, 2, 6, 6))],
+            [],
+        ]
+        with (
+            patch.dict(sys.modules, {"sparrow_engine": engine}),
+            patch.object(detector_cli, "MegaDetector", detector),
+            redirect_stdout(io.StringIO()),
+            redirect_stderr(io.StringIO()),
+        ):
+            status = detector_cli.main(self.args("--image", str(first), str(second), str(missing)))
+
+        self.assertEqual(status, 1)
+        engine.init.assert_called_once_with(device="cpu", model_dir=str(self.bundle.parent))
+        detector.assert_called_once_with(confidence_threshold=0.20)
+        report = json.loads((self.output / "results.json").read_text())
+        self.assertEqual(report["manifest_sha256"],
+                         detector_cli.sha256(self.root / "Code/configs/dataset_manifest.csv"))
+        detected, blank, failed = report["images"]
+        self.assertEqual(detected["group"], "Bird")
+        self.assertEqual(detected["oriented_size"], [8, 6])
+        self.assertEqual(detected["detection_count"], 2)
+        self.assertAlmostEqual(detected["max_box_iou"], 0.6)
+        for item in detected["detections"]:
+            with Image.open(self.output / item["crop_path"]) as crop:
+                self.assertEqual(crop.size, (4, 4))
+        self.assertEqual(blank["detection_count"], 0)
+        self.assertTrue((self.output / blank["preview_path"]).is_file())
+        self.assertEqual(failed["error"]["stage"], "input")
+        self.assertIsNone(failed["detection_count"])
+        summary = json.loads((self.output / "summary.json").read_text())
+        self.assertEqual(summary["overall"]["coverage_pct"], 50.0)
+        self.assertEqual(summary["overall"]["processing_failures"], 1)
+        self.assertEqual(summary["overall"]["multiple_detections"], 1)
+        self.assertEqual(summary["by_group"]["Bird"]["coverage_pct"], 100.0)
 
 
 if __name__ == "__main__":

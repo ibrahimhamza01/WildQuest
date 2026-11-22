@@ -58,6 +58,18 @@ The script reads the frozen `val` split and requires a trained checkpoint with t
 
 The default device is CUDA. Pass `--device cpu` to run on CPU. The defaults are `--batch-size 64` and `--num-workers 2`. Reports go to `outputs/analysis/efficientnet_b0_v1/validation/` unless you pass `--output-dir`. The script writes top-1 and top-3 accuracy, cross-entropy, and macro metrics to `summary.json`. It also writes `per_class.csv`, `confusion_matrix.csv`, `confusion_matrix.png`, and `mistakes.csv`.
 
+## Standalone Model Evaluation
+
+Evaluate saved classifier predictions with Python and Pillow. This workflow runs offline with a prediction CSV and the frozen class mapping.
+
+```bash
+python Code/scripts/evaluate_predictions.py \
+  --predictions path/to/predictions.csv \
+  --output-dir outputs/evaluation/example
+```
+
+See the [model evaluation guide](docs/model_evaluation.md) for the CSV contract, metric definitions, report formats, and a synthetic example.
+
 ## Standalone Animal Detection
 
 MegaDetector locates animals and saves bounding boxes and crops. Follow the [animal detection guide](docs/animal_detection.md) to set up the separate CPU runtime and define `detector_python` and `detector_bundle`. Choose a new run directory under `outputs/detection/` each time.

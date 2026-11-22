@@ -48,6 +48,27 @@ python Code/scripts/train_classifier.py
 
 Training settings are defined in `Code/configs/train_efficientnet_b0.json`.
 
+**6. Analyze the saved classifier on validation images**
+
+```bash
+python Code/scripts/analyze_validation.py
+```
+
+The script reads the frozen `val` split and requires a trained checkpoint with the matching manifest hash and class mapping. Its default checkpoint is `outputs/baselines/efficientnet_b0_v1/best.pt`. Use `--checkpoint outputs/efficientnet_b0/best.pt` for a checkpoint produced under the default training settings.
+
+The default device is CUDA. Pass `--device cpu` to run on CPU. The defaults are `--batch-size 64` and `--num-workers 2`. Reports go to `outputs/analysis/efficientnet_b0_v1/validation/` unless you pass `--output-dir`. The script writes top-1 and top-3 accuracy, cross-entropy, and macro metrics to `summary.json`. It also writes `per_class.csv`, `confusion_matrix.csv`, `confusion_matrix.png`, and `mistakes.csv`.
+
+## Standalone Animal Detection
+
+MegaDetector locates animals and saves bounding boxes and crops. Follow the [animal detection guide](docs/animal_detection.md) to set up the separate CPU runtime and define `detector_python` and `detector_bundle`. Choose a new run directory under `outputs/detection/` each time.
+
+```bash
+"$detector_python" Code/scripts/test_detector.py \
+  --image data/raw/images/train/02/18592269.jpg \
+  --model-bundle "$detector_bundle" \
+  --output-dir outputs/detection/single-photo
+```
+
 ## Components
 
 - [EfficientNet classifier](src/wildquest/classifier/README.md) — Architecture, transfer learning, training configuration, and results.

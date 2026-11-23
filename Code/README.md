@@ -70,6 +70,16 @@ python Code/scripts/evaluate_predictions.py \
 
 See the [model evaluation guide](docs/model_evaluation.md) for the CSV contract, metric definitions, report formats, and a synthetic example.
 
+## Observations and XP
+
+Record classified animals in SQLite, build each user's species collection, and award XP with encounter deduplication. Standard library only; rules live in `Code/configs/gamification.json`.
+
+```bash
+python -m unittest Code/tests/test_observations.py Code/tests/test_gamification.py -v
+```
+
+See the [observation system guide](docs/observation_system.md) for the event format, XP and encounter rules, and the service API.
+
 ## Standalone Animal Detection
 
 MegaDetector locates animals and saves bounding boxes and crops. Follow the [animal detection guide](docs/animal_detection.md) to set up the separate CPU runtime and define `detector_python` and `detector_bundle`. Choose a new run directory under `outputs/detection/` each time.

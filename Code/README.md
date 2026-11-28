@@ -8,7 +8,7 @@ Run all commands from the **repository root**.
 
 Development and GPU training use the course-provided `dl-venv` on AWS EC2.
 
-Python dependencies are listed in `Code/requirements.txt`. On a fresh environment, install the appropriate CUDA-compatible PyTorch build and the listed dependencies.
+Use `python -m pip install -r Code/requirements.txt` in a fresh environment for CPU detection. If you plan to run the classifier or training on CUDA, install the compatible PyTorch and torchvision CUDA builds first. For CUDA detection, follow the [CUDA detector setup](docs/inference_pipeline.md#cuda-detector) to select the GPU detector packages from the same dependency setup.
 
 The dataset downloader requires AWS CLI v2 and read access to the team's S3 bucket.
 
@@ -57,6 +57,16 @@ python Code/scripts/analyze_validation.py
 The script reads the frozen `val` split and requires a trained checkpoint with the matching manifest hash and class mapping. Its default checkpoint is `outputs/baselines/efficientnet_b0_v1/best.pt`. Use `--checkpoint outputs/efficientnet_b0/best.pt` for a checkpoint produced under the default training settings.
 
 The default device is CUDA. Pass `--device cpu` to run on CPU. The defaults are `--batch-size 64` and `--num-workers 2`. Reports go to `outputs/analysis/efficientnet_b0_v1/validation/` unless you pass `--output-dir`. The script writes top-1 and top-3 accuracy, cross-entropy, and macro metrics to `summary.json`. It also writes `per_class.csv`, `confusion_matrix.csv`, `confusion_matrix.png`, and `mistakes.csv`.
+
+**7. Predict species in a photograph**
+
+```bash
+python Code/scripts/predict_image.py \
+  --image data/raw/images/train/02/18592269.jpg \
+  --model-bundle outputs/detection/models/sparrow-zoo-0.33.0/MDV6-yolov10-e
+```
+
+Use the local path to your unpacked MegaDetector bundle. The command defaults to CPU inference and writes one JSON result with a box and Top-3 species predictions for each detected animal. See the [integrated inference guide](docs/inference_pipeline.md) for environment setup, CUDA options, and exit codes.
 
 ## Standalone Model Evaluation
 

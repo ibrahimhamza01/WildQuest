@@ -1,14 +1,36 @@
 """Adapt SPARROW-Engine MegaDetector predictions to WildQuest boxes."""
 
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from PIL import Image
 
-from .crops import ImageSource, PixelBox, _clip_box, _prepare_image
+from .crops import ImageSource, PixelBox, _clip_box, prepare_image
 
 MODEL_ID = "MDV6-yolov10-e"
+DEFAULT_CONFIDENCE_THRESHOLD = 0.20
+
+
+def read_model_bundle(bundle: Path) -> tuple[Path, dict, Path]:
+    """Return the manifest path, model table, and local weights path."""
+    if bundle.name != MODEL_ID:
+        raise ValueError(f"--model-bundle must point to the unpacked {MODEL_ID} ONNX directory")
+    manifest = bundle / "manifest.toml"
+    with manifest.open("rb") as handle:
+        model = tomllib.load(handle).get("model", {})
+    if not isinstance(model, dict) or model.get("id") != MODEL_ID or model.get("format") != "onnx":
+        raise ValueError(f"--model-bundle must point to the unpacked {MODEL_ID} ONNX directory")
+    filename = model.get("file")
+    if not isinstance(filename, str) or not filename:
+        raise ValueError("Model manifest is missing its ONNX file path")
+    onnx_file = (bundle / filename).resolve()
+    if not onnx_file.is_relative_to(bundle) or onnx_file.suffix != ".onnx":
+        raise ValueError("Model manifest must point to an ONNX file inside the bundle")
+    if not onnx_file.is_file():
+        raise FileNotFoundError(f"Detector ONNX weights not found: {onnx_file}")
+    return manifest, model, onnx_file
 
 
 @dataclass(frozen=True)
@@ -44,14 +66,14 @@ class MegaDetector:
     directory. SPARROW-Engine initializes and loads the model on demand.
     """
 
-    def __init__(self, confidence_threshold: float = 0.20):
+    def __init__(self, confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD):
         if not 0.0 <= confidence_threshold <= 1.0:
             raise ValueError("confidence_threshold must be between 0 and 1")
         self.confidence_threshold = confidence_threshold
 
     def detect(self, image: ImageSource) -> list[Detection]:
         """Return every valid animal detection at or above the confidence threshold."""
-        source = _prepare_image(image)
+        source = prepare_image(image)
         predictions = _sparrow_predictions(source, self.confidence_threshold)
         detections = []
         for prediction in predictions:

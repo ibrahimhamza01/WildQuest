@@ -9,7 +9,6 @@ import json
 import os
 import random
 import sys
-import tomllib
 from collections import defaultdict
 from itertools import combinations
 from pathlib import Path
@@ -20,7 +19,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "Code/src"))
 
 from wildquest.detection import MegaDetector, crop_animal  # noqa: E402
-from wildquest.detection.megadetector import MODEL_ID  # noqa: E402
+from wildquest.detection.megadetector import (  # noqa: E402
+    DEFAULT_CONFIDENCE_THRESHOLD, MODEL_ID, read_model_bundle,
+)
 
 SPLITS = ("train", "val")
 
@@ -107,16 +108,7 @@ def output_directory(path):
 
 
 def model_metadata(bundle):
-    manifest = bundle / "manifest.toml"
-    with manifest.open("rb") as handle:
-        model = tomllib.load(handle).get("model", {})
-    if bundle.name != MODEL_ID or model.get("id") != MODEL_ID or model.get("format") != "onnx":
-        raise ValueError(f"--model-bundle must point to the unpacked {MODEL_ID} ONNX directory")
-    if not model.get("file"):
-        raise ValueError("Model manifest is missing its ONNX file path")
-    onnx_file = (bundle / model["file"]).resolve()
-    if not onnx_file.is_relative_to(bundle) or onnx_file.suffix != ".onnx":
-        raise ValueError("Model manifest must point to an ONNX file inside the bundle")
+    manifest, model, onnx_file = read_model_bundle(bundle)
     return {
         "id": MODEL_ID,
         "version": model.get("version"),
@@ -262,7 +254,8 @@ def main(argv=None):
     inputs.add_argument("--split", choices=SPLITS, help="Sample this frozen dataset split")
     parser.add_argument("--sample-per-class", type=int, default=4, help="Manifest sample size per class")
     parser.add_argument("--seed", type=int, default=42, help="Manifest sampling seed")
-    parser.add_argument("--threshold", type=float, default=0.20, help="Minimum animal confidence")
+    parser.add_argument("--threshold", type=float, default=DEFAULT_CONFIDENCE_THRESHOLD,
+                        help="Minimum animal confidence")
     parser.add_argument("--model-bundle", type=Path, required=True,
                         help=f"Unpacked local {MODEL_ID} directory containing manifest.toml")
     parser.add_argument("--output-dir", type=Path, required=True,

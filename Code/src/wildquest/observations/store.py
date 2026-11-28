@@ -142,6 +142,13 @@ class ObservationStore:
         self._db.execute("UPDATE observations SET encounter_id = ? WHERE id = ?",
                          (encounter_id, observation_id))
 
+    def has_verified_observation(self, user_id: str, class_id: int, exclude_id: int) -> bool:
+        return self._db.execute(
+            """SELECT 1 FROM observations
+               WHERE user_id = ? AND class_id = ? AND status = 'VERIFIED' AND id != ?
+               LIMIT 1""",
+            (user_id, class_id, exclude_id)).fetchone() is not None
+
     def verified_between(self, user_id: str, class_id: int, start: datetime, end: datetime,
                          exclude_id: int) -> List[Observation]:
         rows = self._db.execute(
@@ -196,12 +203,6 @@ class ObservationStore:
                VALUES (?, ?, ?, ?, ?, ?)""",
             (observation.id, observation.user_id, observation.class_id, reason.value, points,
              to_utc_text(awarded_at)))
-
-    def has_first_discovery(self, user_id: str, class_id: int) -> bool:
-        return self._db.execute(
-            """SELECT 1 FROM xp_awards
-               WHERE user_id = ? AND class_id = ? AND reason = 'FIRST_DISCOVERY'""",
-            (user_id, class_id)).fetchone() is not None
 
     def count_awards(self, user_id: str, class_id: int, reason: XPOutcome, start: datetime,
                      end: datetime) -> int:

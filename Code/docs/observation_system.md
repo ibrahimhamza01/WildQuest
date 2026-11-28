@@ -81,13 +81,15 @@ Each verified observation gets one outcome:
 | Outcome | When | XP (default) |
 |---|---|---|
 | `FIRST_DISCOVERY` | First verified observation of this species for this user | 100 |
-| `NEW_ENCOUNTER` | Not part of any existing encounter | 10 |
-| `SAME_ENCOUNTER` | Part of an encounter that was already rewarded | 0 |
-| `DAILY_LIMIT_REACHED` | New encounter, but this species already earned `max_encounter_awards_per_species_per_day` (3) encounter awards today | 0 |
+| `NEW_ENCOUNTER` | Distinct encounter of an already discovered species, with any positive award within the daily cap | 10 |
+| `SAME_ENCOUNTER` | Part of an existing encounter | 0 |
+| `DAILY_LIMIT_REACHED` | A positive encounter award would exceed the species' daily cap (default 3 awards) | 0 |
 
 The other outcomes are `PENDING_REVIEW`, `REJECTED`, and `DUPLICATE_REQUEST`.
 
-The daily cap counts awards by **server time** (UTC day), not by `observed_at`. Photo timestamps come from the client and could be back-dated to spread one animal across many fake encounters.
+A user's first verified observation of a species marks it as discovered, whether verified automatically or approved through review. With `first_discovery_xp = 0`, it still returns `FIRST_DISCOVERY` with `new_species = True` and appears in the collection. The XP ledger records only positive awards.
+
+The daily cap counts positive `NEW_ENCOUNTER` awards by **server time** (UTC day). Photo timestamps come from the client and could be back-dated to spread one animal across many fake encounters. With `encounter_xp = 0`, distinct encounters of a discovered species return `NEW_ENCOUNTER` with zero XP and use none of the award quota.
 
 ### Duplicate requests
 
@@ -96,7 +98,7 @@ The daily cap counts awards by **server time** (UTC day), not by `observed_at`. 
 - **Database guarantees:**
   - every check-and-award sequence runs in a `BEGIN IMMEDIATE` transaction, so concurrent processes cannot award twice
   - `xp_awards.observation_id` is `UNIQUE`
-  - a partial unique index allows only one `FIRST_DISCOVERY` per user and species
+  - a partial unique index allows only one `FIRST_DISCOVERY` award per user and species
 
 ## Reading data
 

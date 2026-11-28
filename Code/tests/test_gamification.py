@@ -133,6 +133,79 @@ class DiscoveryAndEncounterTests(ServiceTestCase):
         self.assertEqual(sum(a["points"] for a in awards), self.service.total_xp("ege"))
         self.assertEqual(awards[0]["species"], NAMES[13])
 
+    def test_zero_daily_cap_blocks_only_positive_encounter_rewards(self):
+        for points, expected in ((0, XPOutcome.NEW_ENCOUNTER),
+                                 (10, XPOutcome.DAILY_LIMIT_REACHED)):
+            with self.subTest(encounter_xp=points):
+                config = GamificationConfig(encounter_xp=points,
+                                            max_encounter_awards_per_species_per_day=0)
+                with ObservationService(":memory:", config, NAMES, clock=self.clock) as service:
+                    first = service.record(event("first"))
+                    self.assertEqual((first.outcome, first.xp_awarded),
+                                     (XPOutcome.FIRST_DISCOVERY, 100))
+                    later = service.record(event("later", hours=7))
+                    self.assertEqual((later.outcome, later.xp_awarded, later.new_species),
+                                     (expected, 0, False))
+                    self.assertEqual([a["reason"] for a in service.xp_history("ege")],
+                                     ["FIRST_DISCOVERY"])
+
+
+class ZeroFirstDiscoveryXPTests(ServiceTestCase):
+    config = GamificationConfig(first_discovery_xp=0, encounter_xp=15)
+
+    def test_discovery_encounters_and_request_retry_without_first_discovery_xp(self):
+        first = self.record("first")
+        self.assertEqual((first.outcome, first.xp_awarded, first.new_species),
+                         (XPOutcome.FIRST_DISCOVERY, 0, True))
+        self.assertEqual(self.service.collection("ege")["discovered"], 1)
+        self.assertEqual(self.service.xp_history("ege"), [])
+
+        retry = self.record("first")
+        self.assertEqual((retry.outcome, retry.xp_awarded, retry.new_species),
+                         (XPOutcome.DUPLICATE_REQUEST, 0, False))
+        self.assertEqual(retry.observation.id, first.observation.id)
+        self.assertEqual(len(self.service.history("ege")), 1)
+
+        repeat = self.record("repeat", hours=1)
+        self.assertEqual((repeat.outcome, repeat.xp_awarded, repeat.new_species),
+                         (XPOutcome.SAME_ENCOUNTER, 0, False))
+        self.assertEqual(repeat.observation.encounter_id, first.observation.encounter_id)
+
+        later = self.record("later", hours=8)
+        self.assertEqual((later.outcome, later.xp_awarded, later.new_species),
+                         (XPOutcome.NEW_ENCOUNTER, 15, False))
+        self.assertEqual(self.service.collection("ege")["discovered"], 1)
+        self.assertEqual([(a["reason"], a["points"]) for a in self.service.xp_history("ege")],
+                         [("NEW_ENCOUNTER", 15)])
+
+    def test_pending_and_rejected_observations_do_not_count_as_discovery(self):
+        self.record("pending", confidence=0.4)
+        rejected = self.record("rejected", confidence=0.4)
+        self.service.review(rejected.observation.id, approve=False)
+        self.assertEqual(self.service.collection("ege")["discovered"], 0)
+
+        first = self.record("verified")
+        self.assertEqual((first.outcome, first.xp_awarded, first.new_species),
+                         (XPOutcome.FIRST_DISCOVERY, 0, True))
+
+    def test_approval_can_discover_a_species_and_award_later_encounter_xp(self):
+        pending = self.record("first", confidence=0.4)
+        approved = self.service.review(pending.observation.id, approve=True)
+        self.assertEqual(approved.observation.status, Status.VERIFIED)
+        self.assertEqual((approved.outcome, approved.xp_awarded, approved.new_species),
+                         (XPOutcome.FIRST_DISCOVERY, 0, True))
+        self.assertEqual(self.service.collection("ege")["discovered"], 1)
+        self.assertEqual(self.service.xp_history("ege"), [])
+
+        retry = self.service.review(pending.observation.id, approve=True)
+        self.assertEqual((retry.outcome, retry.xp_awarded, retry.new_species),
+                         (XPOutcome.DUPLICATE_REQUEST, 0, False))
+
+        later = self.record("later", confidence=0.4, hours=7)
+        later_approved = self.service.review(later.observation.id, approve=True)
+        self.assertEqual((later_approved.outcome, later_approved.xp_awarded,
+                          later_approved.new_species), (XPOutcome.NEW_ENCOUNTER, 15, False))
+
 
 class DuplicateRequestTests(ServiceTestCase):
     def test_retried_request_is_not_recorded_or_awarded_twice(self):

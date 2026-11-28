@@ -81,8 +81,8 @@ class PersistenceTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def service(self):
-        return ObservationService(self.db, GamificationConfig(), NAMES, clock=lambda: NOW)
+    def service(self, config=GamificationConfig()):
+        return ObservationService(self.db, config, NAMES, clock=lambda: NOW)
 
     def test_observations_and_xp_survive_reopening(self):
         with self.service() as service:
@@ -94,6 +94,19 @@ class PersistenceTests(unittest.TestCase):
             self.assertEqual(stored.status, Status.VERIFIED)
             self.assertEqual(service.total_xp("ege"), 100)
             self.assertEqual(service.collection("ege")["discovered"], 1)
+
+    def test_zero_xp_discovery_survives_reopening_with_default_rewards(self):
+        with self.service(GamificationConfig(first_discovery_xp=0)) as service:
+            first = service.record(event(observed_at="2026-11-20T06:00:00Z"))
+            self.assertTrue(first.new_species)
+            self.assertEqual(service.xp_history("ege"), [])
+
+        with self.service() as service:
+            self.assertEqual(service.collection("ege")["discovered"], 1)
+            later = service.record(event("later"))
+            self.assertEqual((later.outcome.value, later.xp_awarded, later.new_species),
+                             ("NEW_ENCOUNTER", 10, False))
+            self.assertEqual(service.total_xp("ege"), 10)
 
     def test_newer_schema_is_refused(self):
         self.service().close()

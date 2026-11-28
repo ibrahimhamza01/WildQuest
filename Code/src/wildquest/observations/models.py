@@ -35,7 +35,7 @@ class Status(str, Enum):
 class XPOutcome(str, Enum):
     FIRST_DISCOVERY = "FIRST_DISCOVERY"          # first verified sighting of a species
     NEW_ENCOUNTER = "NEW_ENCOUNTER"              # verified sighting outside any earlier encounter
-    SAME_ENCOUNTER = "SAME_ENCOUNTER"            # repeat of an encounter already rewarded
+    SAME_ENCOUNTER = "SAME_ENCOUNTER"            # repeat of an existing encounter
     DAILY_LIMIT_REACHED = "DAILY_LIMIT_REACHED"  # new encounter, but the species' daily cap is used
     PENDING_REVIEW = "PENDING_REVIEW"            # stored as NEEDS_REVIEW, no XP yet
     REJECTED = "REJECTED"                        # reviewer rejected the observation

@@ -132,18 +132,18 @@ class ObservationService:
             return XPOutcome.SAME_ENCOUNTER, 0
 
         self.store.set_encounter(observation.id, observation.id)
-        if not self.store.has_first_discovery(observation.user_id, observation.class_id):
+        if not self.store.has_verified_observation(observation.user_id, observation.class_id,
+                                                   exclude_id=observation.id):
             outcome, points = XPOutcome.FIRST_DISCOVERY, self.config.first_discovery_xp
         else:
-            # Daily cap uses the server clock: observed_at comes from the client and could be
-            # back-dated to spread one animal over many fake "encounters".
-            day_start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
-            used = self.store.count_awards(observation.user_id, observation.class_id,
-                                           XPOutcome.NEW_ENCOUNTER, day_start,
-                                           day_start + timedelta(days=1))
-            if used >= self.config.max_encounter_awards_per_species_per_day:
-                return XPOutcome.DAILY_LIMIT_REACHED, 0
             outcome, points = XPOutcome.NEW_ENCOUNTER, self.config.encounter_xp
+            if points > 0:
+                # Use the server clock so back-dating an observation cannot bypass the cap.
+                day_start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
+                used = self.store.count_awards(observation.user_id, observation.class_id,
+                                               outcome, day_start, day_start + timedelta(days=1))
+                if used >= self.config.max_encounter_awards_per_species_per_day:
+                    return XPOutcome.DAILY_LIMIT_REACHED, 0
         if points > 0:
             self.store.insert_award(observation, outcome, points, now)
         return outcome, points

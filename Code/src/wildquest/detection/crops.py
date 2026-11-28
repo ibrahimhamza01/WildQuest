@@ -10,11 +10,12 @@ ImageSource = str | Path | Image.Image
 PixelBox = tuple[int, int, int, int]
 
 
-def _prepare_image(image: ImageSource) -> Image.Image:
+def prepare_image(image: ImageSource) -> Image.Image:
+    """Decode a photograph as RGB pixels in its EXIF-corrected orientation."""
     if isinstance(image, Image.Image):
         return ImageOps.exif_transpose(image).convert("RGB")
     with Image.open(image) as source:
-        return _prepare_image(source)
+        return prepare_image(source)
 
 
 def _clip_box(
@@ -45,12 +46,19 @@ def _clip_box(
     return floor(left), floor(top), ceil(right), ceil(bottom)
 
 
+def is_valid_pixel_box(box: object, size: tuple[int, int]) -> bool:
+    """Check that an integer XYXY box is valid without clipping or rounding."""
+    return (isinstance(box, tuple) and len(box) == 4
+            and all(type(coordinate) is int for coordinate in box)
+            and _clip_box(box, size) == box)
+
+
 def crop_animal(image: ImageSource, box: Sequence[float]) -> Image.Image | None:
     """Crop an EXIF-oriented RGB image, returning None for an invalid box.
 
     The box is (left, top, right, bottom) in source pixels with exclusive
     right and bottom edges. The crop keeps the source resolution.
     """
-    source = _prepare_image(image)
+    source = prepare_image(image)
     clipped_box = _clip_box(box, source.size)
     return source.crop(clipped_box) if clipped_box is not None else None

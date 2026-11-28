@@ -19,7 +19,7 @@ The weights are licensed **AGPL-3.0** and come from Microsoft's **Sparrow Model 
 | `MDV6-yolov10-e/1/model.onnx` | SHA-256 | `9a9f22b85046496fb3b8cdb9b8ad27a4485bf6daf1f43de7fb10f9b44e702c13` |
 | `MDV6-yolov10-e/manifest.toml` | SHA-256 | `56ecf2dc6f43442d8710ea4d3d4b239b3032373fe6b85298a5befede3bb207fe` |
 
-The smoke test and validation run used **CPU inference on x86-64 Linux** in a separate **Python `3.13.14`** virtual environment. GPU execution remains unverified. The CLI initializes the CPU device explicitly.
+The standalone smoke test and validation run used **CPU inference on x86-64 Linux** in a separate **Python `3.13.14`** virtual environment. The standalone CLI initializes the CPU device explicitly. See the [integrated inference guide](inference_pipeline.md) for CUDA setup and verification.
 
 ## Implementation and Python API
 

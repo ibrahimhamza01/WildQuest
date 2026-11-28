@@ -3,3 +3,5 @@ torchvision==0.28.0
 Pillow==12.2.0
 pandas==3.0.5
 matplotlib==3.11.1
+sparrow-engine==0.1.32
+onnxruntime==1.25.1

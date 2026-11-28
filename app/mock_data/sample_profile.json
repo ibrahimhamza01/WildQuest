@@ -1,0 +1,29 @@
+{
+    "_note": "Deterministic demo profile in the format of ObservationService (issue #12). Not real data.",
+    "user_id": "demo-user",
+    "total_xp": 720,
+    "history": [
+      {"id": 11, "class_id": 21, "confidence": 0.55, "observed_at": "2026-11-21T16:40:00Z",
+       "status": "NEEDS_REVIEW", "encounter_id": null, "outcome": "PENDING_REVIEW", "xp_awarded": 0},
+      {"id": 10, "class_id": 18, "confidence": 0.90, "observed_at": "2026-11-21T09:12:00Z",
+       "status": "VERIFIED", "encounter_id": 10, "outcome": "NEW_ENCOUNTER", "xp_awarded": 10},
+      {"id": 9, "class_id": 0, "confidence": 0.93, "observed_at": "2026-11-20T17:30:00Z",
+       "status": "VERIFIED", "encounter_id": 9, "outcome": "NEW_ENCOUNTER", "xp_awarded": 10},
+      {"id": 8, "class_id": 8, "confidence": 0.88, "observed_at": "2026-11-19T13:05:00Z",
+       "status": "VERIFIED", "encounter_id": 8, "outcome": "FIRST_DISCOVERY", "xp_awarded": 100},
+      {"id": 7, "class_id": 13, "confidence": 0.97, "observed_at": "2026-11-18T07:44:00Z",
+       "status": "VERIFIED", "encounter_id": 7, "outcome": "FIRST_DISCOVERY", "xp_awarded": 100},
+      {"id": 6, "class_id": 4, "confidence": 0.92, "observed_at": "2026-11-17T15:20:00Z",
+       "status": "VERIFIED", "encounter_id": 6, "outcome": "FIRST_DISCOVERY", "xp_awarded": 100},
+      {"id": 5, "class_id": 18, "confidence": 0.95, "observed_at": "2026-11-16T12:02:00Z",
+       "status": "VERIFIED", "encounter_id": 5, "outcome": "FIRST_DISCOVERY", "xp_awarded": 100},
+      {"id": 4, "class_id": 0, "confidence": 0.89, "observed_at": "2026-11-15T10:31:00Z",
+       "status": "VERIFIED", "encounter_id": 3, "outcome": "SAME_ENCOUNTER", "xp_awarded": 0},
+      {"id": 3, "class_id": 0, "confidence": 0.94, "observed_at": "2026-11-15T10:25:00Z",
+       "status": "VERIFIED", "encounter_id": 3, "outcome": "FIRST_DISCOVERY", "xp_awarded": 100},
+      {"id": 2, "class_id": 2, "confidence": 0.91, "observed_at": "2026-11-15T10:20:00Z",
+       "status": "VERIFIED", "encounter_id": 2, "outcome": "FIRST_DISCOVERY", "xp_awarded": 100},
+      {"id": 1, "class_id": 17, "confidence": 0.96, "observed_at": "2026-11-14T21:48:00Z",
+       "status": "VERIFIED", "encounter_id": 1, "outcome": "FIRST_DISCOVERY", "xp_awarded": 100}
+    ]
+  }

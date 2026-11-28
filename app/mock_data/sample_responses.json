@@ -1,0 +1,67 @@
+{
+    "_note": "Deterministic demo responses. Not real model output.",
+    "single": {
+      "status": "ok",
+      "is_mock": true,
+      "detections": [
+        {
+          "box": [0.22, 0.18, 0.78, 0.92],
+          "detector_confidence": 0.97,
+          "predictions": [
+            {"class_id": 17, "confidence": 0.94},
+            {"class_id": 9, "confidence": 0.03},
+            {"class_id": 12, "confidence": 0.01}
+          ]
+        }
+      ]
+    },
+    "multiple": {
+      "status": "ok",
+      "is_mock": true,
+      "detections": [
+        {
+          "box": [0.05, 0.40, 0.42, 0.85],
+          "detector_confidence": 0.93,
+          "predictions": [
+            {"class_id": 0, "confidence": 0.91},
+            {"class_id": 2, "confidence": 0.06},
+            {"class_id": 1, "confidence": 0.01}
+          ]
+        },
+        {
+          "box": [0.55, 0.30, 0.95, 0.80],
+          "detector_confidence": 0.89,
+          "predictions": [
+            {"class_id": 2, "confidence": 0.88},
+            {"class_id": 0, "confidence": 0.08},
+            {"class_id": 1, "confidence": 0.02}
+          ]
+        }
+      ]
+    },
+    "uncertain": {
+      "status": "ok",
+      "is_mock": true,
+      "detections": [
+        {
+          "box": [0.30, 0.25, 0.70, 0.75],
+          "detector_confidence": 0.81,
+          "predictions": [
+            {"class_id": 18, "confidence": 0.52},
+            {"class_id": 21, "confidence": 0.31},
+            {"class_id": 12, "confidence": 0.09}
+          ]
+        }
+      ]
+    },
+    "no_animal": {
+      "status": "no_animal",
+      "is_mock": true,
+      "detections": []
+    },
+    "error": {
+      "status": "error",
+      "is_mock": true,
+      "message": "The identification service did not respond. Please try again."
+    }
+  }

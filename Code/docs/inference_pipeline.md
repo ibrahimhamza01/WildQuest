@@ -4,12 +4,29 @@
 
 ## Runtime and model files
 
-Run the examples from the repository root using the classifier environment. Verification used Linux x86-64, Python `3.13.14`, PyTorch `2.13.0+cu130`, torchvision `0.28.0+cu130`, and Pillow `12.2.0`. The base Python dependencies are in [requirements.txt](../requirements.txt).
+Run the examples from the repository root. Verification used Linux x86-64, Python `3.13.14`, PyTorch `2.13.0+cu130`, torchvision `0.28.0+cu130`, and Pillow `12.2.0`. The [requirements file](../requirements.txt) includes the shared dependencies and the CPU detector packages.
 
 Choose the detector packages for the device that will run MegaDetector. The CPU and GPU distributions share import names. Use separate Python environments if you need both detector variants. The CPU detector can run in a CUDA-enabled PyTorch environment for mixed execution. [SPARROW-Engine installation guide](https://github.com/microsoft/SPARROW-Engine#python-package-only-pypi)
 
-- **CPU detector.** In a classifier environment prepared for the CPU detector, run `python -m pip install -r Code/requirements-inference.txt`. This installs `sparrow-engine==0.1.32` and `onnxruntime==1.25.1`. For a CUDA classifier with this detector, use a CUDA-enabled PyTorch build in the same environment.
-- **CUDA detector.** Use the EC2 CUDA-enabled `dl-venv` with `sparrow-engine-gpu==0.1.32` and `onnxruntime-gpu==1.25.1`. On a fresh GPU inference environment with the classifier dependencies installed, add these two versioned packages with `python -m pip install sparrow-engine-gpu==0.1.32 onnxruntime-gpu==1.25.1`.
+### CPU detector
+
+In a fresh environment, install the shared dependencies and the CPU pair (`sparrow-engine==0.1.32` and `onnxruntime==1.25.1`).
+
+```bash
+python -m pip install -r Code/requirements.txt
+```
+
+For a CUDA classifier with a CPU detector, install the compatible CUDA builds of PyTorch and torchvision before running this command.
+
+### CUDA detector
+
+The provisioned EC2 `dl-venv` can be used as is if it already has the verified GPU packages. In a fresh environment, install the compatible CUDA builds of PyTorch and torchvision first if the classifier will also run on CUDA. Then use this Bash command to install the shared requirements and the GPU pair in one step. It filters out the CPU detector pins.
+
+```bash
+python -m pip install \
+  -r <(sed -E '/^(sparrow-engine|onnxruntime)==/d' Code/requirements.txt) \
+  sparrow-engine-gpu==0.1.32 onnxruntime-gpu==1.25.1
+```
 
 Run `python -m pip check` after setup. For GPU setup, check that `nvidia-smi` sees the GPU and that Python reports the expected runtime before running the photo example.
 
@@ -90,15 +107,17 @@ The CLI serializes the reusable pipeline's `PhotoInferenceResult.to_dict()` usin
 
 `oriented_size` is `[width, height]` in source pixels after EXIF correction. It is `null` if the pipeline has no decoded dimensions. Boxes are integer `[left, top, right, bottom]` coordinates in that pixel grid, with right and bottom exclusive. Predictions stay in detector order, including overlapping boxes. The highest-ranked of the three species is also the primary prediction. Species IDs range from 0 to 24, and confidence scores remain numeric at model precision.
 
+The MegaDetector adapter keeps qualifying animal detections and discards malformed, non-finite, or empty boxes before handing the accepted list to the pipeline. If nothing remains, the result is `no_detection`. Discarded boxes do not generate errors or contribute to `partial` status. A partial result requires both a successful prediction and a failure while processing the accepted list.
+
 | Status | Exit code | Meaning |
 | --- | --- | --- |
-| `ok` | `0` | All detected animals were classified. |
-| `no_detection` | `0` | Detection completed and `predictions` is empty. |
-| `partial` | `3` | At least one prediction succeeded and at least one detection, crop, or classification failed. |
-| `error` | `2` | The photo or a model artifact was missing or invalid. |
-| `error` | `1` | A fatal runtime or inference error occurred. |
+| `ok` | `0` | All accepted animal detections were classified. |
+| `no_detection` | `0` | Detection completed with no accepted animal detections. |
+| `partial` | `3` | At least one prediction succeeded and another accepted detection failed during processing. |
+| `error` | `2` | Input or model preflight validation failed, including unreadable photos, missing artifacts, invalid bundle metadata, or checkpoint validation failures. |
+| `error` | `1` | A fatal runtime or inference error occurred, including ONNX model loading failures after preflight. |
 
-Every error entry contains `stage` (`input`, `detector`, `crop`, or `classifier`), `error_type`, `message`, and `detection_index`. The index is zero-based in detector order and is `null` for failures that apply to the entire photo or setup. Argument syntax errors exit `2` with argparse diagnostics on stderr. Failure to write the requested output exits `1` with a stderr diagnostic.
+Every error entry contains `stage` (`input`, `detector`, `crop`, or `classifier`), `error_type`, `message`, and `detection_index`. The index is zero-based in the list passed to the pipeline after MegaDetector filtering, and it is `null` for photo-level or setup errors. Argument syntax errors exit `2` with argparse diagnostics on stderr. Failure to write the requested output exits `1` with a stderr diagnostic.
 
 ## Verification and limitations
 

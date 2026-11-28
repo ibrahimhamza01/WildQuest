@@ -308,6 +308,32 @@ class PipelineTests(unittest.TestCase):
         })
         self.classifier.predict.assert_not_called()
 
+    def test_megadetector_filters_bad_boxes_before_pipeline_status_and_indexing(self):
+        malformed = SimpleNamespace(label="animal", confidence=0.9, bbox=SimpleNamespace(
+            x_min=0.5, y_min=0, x_max=0, y_max=1,
+        ))
+        left = SimpleNamespace(label="animal", confidence=0.9, bbox=SimpleNamespace(
+            x_min=0, y_min=0, x_max=0.5, y_max=1,
+        ))
+        right = SimpleNamespace(label="animal", confidence=0.9, bbox=SimpleNamespace(
+            x_min=0.5, y_min=0, x_max=1, y_max=1,
+        ))
+        pipeline = InferencePipeline(MegaDetector(), self.classifier)
+        with patch("wildquest.detection.megadetector._sparrow_predictions") as backend:
+            backend.return_value = [malformed]
+            empty = pipeline.predict(self.image)
+            self.assertEqual((empty.status, empty.predictions, empty.errors), ("no_detection", (), ()))
+            self.classifier.predict.assert_not_called()
+
+            backend.return_value = [malformed, left, right]
+            self.classifier.predict.side_effect = [self.goose, RuntimeError("classification failed")]
+            partial = pipeline.predict(self.image)
+
+        self.assertEqual(partial.status, "partial")
+        self.assertEqual([item.detection.box for item in partial.predictions], [(0, 0, 3, 4)])
+        self.assertEqual([(error.stage, error.detection_index) for error in partial.errors],
+                         [("classifier", 1)])
+
     def test_path_and_pil_inputs_use_the_same_exif_oriented_rgb_pixels(self):
         original = Image.new("L", (3, 2))
         original.putpixel((0, 0), 220)

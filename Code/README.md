@@ -8,7 +8,7 @@ Run all commands from the **repository root**.
 
 Development and GPU training use the course-provided `dl-venv` on AWS EC2.
 
-Python dependencies are listed in `Code/requirements.txt`. On a fresh environment, install the appropriate CUDA-compatible PyTorch build and the listed dependencies.
+Use `python -m pip install -r Code/requirements.txt` in a fresh environment for CPU detection. If you plan to run the classifier or training on CUDA, install the compatible PyTorch and torchvision CUDA builds first. For CUDA detection, follow the [CUDA detector setup](docs/inference_pipeline.md#cuda-detector) to select the GPU detector packages from the same dependency setup.
 
 The dataset downloader requires AWS CLI v2 and read access to the team's S3 bucket.
 

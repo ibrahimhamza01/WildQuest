@@ -1,0 +1,9 @@
+{
+  "review_threshold": 0.70,
+  "first_discovery_xp": 100,
+  "encounter_xp": 10,
+  "encounter_window_hours": 6.0,
+  "encounter_radius_m": 500.0,
+  "max_encounter_awards_per_species_per_day": 3,
+  "max_future_skew_minutes": 10.0
+}
